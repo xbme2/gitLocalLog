@@ -5,13 +5,15 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"strings"
 )
+
+type scanner interface {
+}
 
 func ScanPath(path string) []string {
 	// safety check in case of too many files
-	if !strings.Contains(path, "/home/xbme2/") {
-		fmt.Println("too many filesto scan")
+	if path == "~/" || path == "~/home" {
+		fmt.Println("too many files to scan")
 		return nil
 	}
 	fmt.Println("begin scaning", path, "--------------------------")
@@ -29,7 +31,7 @@ func ScanPath(path string) []string {
 func scanResurive(path string) (repositories []string) {
 	entries, err := os.ReadDir(path)
 	if err != nil {
-		fmt.Println("fail to open path")
+		fmt.Println("fail to open path", path)
 		log.Fatal(err.Error())
 	}
 	for _, entry := range entries {

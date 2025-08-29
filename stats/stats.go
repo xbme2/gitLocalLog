@@ -41,6 +41,18 @@ const (
 	DeletionNum
 )
 
+const (
+	RepoLimit = 5
+)
+
+const (
+	None   = 0
+	Less   = 2
+	Middle = 5
+	Much   = 10
+	More   = 15
+)
+
 type AuthorStat struct {
 	Name           string
 	Commits        int
@@ -60,12 +72,7 @@ type Stats struct {
 	Find           bool // 是否找到name 作者
 }
 
-// var NumberWeek = map[int]string{
-// 	0: "Sun",
-// 	1: "Mon",
-// 	2:"Fer"
-// }
-
+// 计算date距离今天的天数
 func calculateDaysSince(date time.Time) int {
 	days := 0
 	now := getStartOfDay(time.Now())
@@ -76,14 +83,11 @@ func calculateDaysSince(date time.Time) int {
 	return days
 }
 
+// 打印一排月份
 func PrintMonths(now time.Time, monthOffset int) {
 	start, _ := startDayRecentMonths(now, monthOffset)
-
 	month := start.Month()
-	fmt.Println(month.String())
 	fmt.Printf("       ")
-	// fmt.Printf(month.String()[:3])
-
 	for {
 		if start.Month() != month {
 			month = start.Month()
@@ -98,10 +102,6 @@ func PrintMonths(now time.Time, monthOffset int) {
 	}
 
 	fmt.Print("\n")
-}
-
-func PrintDays(commits map[int]int) {
-
 }
 
 func PrintWeek(weekIndex int) {
@@ -119,25 +119,22 @@ func PrintWeek(weekIndex int) {
 
 func printDay(commitNum int) {
 	switch {
-	case commitNum == 0:
+	case commitNum == None:
 		color.New(color.FgBlack).Print("--") // 空格子
 		fmt.Printf(" ")
-	case commitNum < 2:
-		// fmt.Printf(" ")
+	case commitNum < Less:
 		color.New(color.BgBlack).Add(color.BgWhite).Print("+", commitNum)
 		fmt.Printf(" ")
-	case commitNum < 5:
-		// fmt.Printf(" ")
+	case commitNum < Middle:
 		color.New(color.BgHiGreen).Add(color.BgHiGreen).Print("+", commitNum)
 		fmt.Printf(" ")
 
-	case commitNum < 10:
+	case commitNum < Much:
 		color.New(color.BgGreen).Add(color.BgWhite).Print("+", commitNum)
 		fmt.Printf(" ")
 	default:
 		color.New(color.BgGreen, color.FgHiWhite).Print(commitNum) // 深绿
 		fmt.Printf(" ")
-		// color.New(color.BgGreen, color.FgWhite).Print("██") // 最深绿
 	}
 }
 
@@ -167,9 +164,9 @@ func printLegend() {
 func uiShow(stat *Stats, offset int, daysTotal int, start time.Time, name string, metric SortType) {
 	switch metric {
 	case Default:
-		printCol(stat, offset, daysTotal, start, name) // 打印贡献图
+		printCol(stat, offset, daysTotal, start, name)
 	case CommitNum, LineNum, DeletionNum:
-		printContribution(stat, metric) // 打印贡献排名
+		printContribution(stat, metric)
 	default:
 		fmt.Println("未知的显示模式。")
 	}
@@ -231,9 +228,11 @@ func printContribution(stat *Stats, metric SortType) {
 }
 
 func printCol(stat *Stats, offset int, daysTotal int, start time.Time, name string) {
-	if len(name) > 0 && stat.TotalComitNum == 0 {
-		fmt.Printf("作者%s 在仓库中尚未有提交\n", name)
-		return
+	if len(name) > 0 {
+		if _, exist := stat.Authors[name]; !exist {
+			fmt.Printf("作者%s 在仓库中尚未有提交\n", name)
+			return
+		}
 	}
 	now := time.Now()
 	PrintMonths(now, offset)
@@ -271,9 +270,14 @@ func GenerateStats(repositories []string, month int, verbose bool, name string, 
 	s.Start()
 	start, days := startDayRecentMonths(time.Now(), month)
 	fillMap(repositories, stat, start, name)
+	if len(name) > 0 && stat.TotalComitNum == 0 {
+		s.Stop()
+		fmt.Printf("作者 %s 在指定的时间范围内没有任何提交记录。\n", name)
+		return
+	}
+	s.Stop()
 	uiShow(stat, month, days, start, name, metric)
 
-	s.Stop()
 	// PrintContribGraph(commits, days)
 
 }
@@ -283,6 +287,10 @@ func fillMap(repositories []string, stat *Stats, since time.Time, name string) {
 	// commitsByAuthor := make(map[string]int)
 	if stat.Authors == nil {
 		stat.Authors = make(map[string]*AuthorStat)
+	}
+	if len(repositories) > RepoLimit {
+		// fmt.Printf("仓库数量为%d, 超过限制，采用并行化\n", len(repositories))
+		// fmt.Printf("IO瓶颈,提速不明显")
 	}
 	for _, repo := range repositories {
 		stat.RepoNum++
